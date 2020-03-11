@@ -1,5 +1,5 @@
 {
-  "name": "redis-cache",
+  "name": "@zcong/redis-cache",
   "version": "0.0.0",
   "description": "my cool project",
   "main": "./dist/index.js",

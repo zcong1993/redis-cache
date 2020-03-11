@@ -1,5 +1,5 @@
-import add from '../src'
+import { RedisCache } from '../src'
 
 it('should work well', () => {
-  expect(add(1, 2)).toBe(3)
+  expect(typeof RedisCache).toBe('function')
 })
