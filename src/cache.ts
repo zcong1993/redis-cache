@@ -30,7 +30,7 @@ export const msetEx = (
 ) => {
   const cmds: string[][] = []
   for (const [k, v] of data.entries()) {
-    cmds.push(['set', `${group}:${k}`, v, 'ex', `${expire}`])
+    cmds.push(['set', RedisCache.buildCacheKey(group, k), v, 'ex', `${expire}`])
   }
   return redis.multi(cmds).exec()
 }
@@ -76,7 +76,9 @@ export class RedisCache {
     try {
       db(`redis mget: ${keys}`)
       cacheRes = await this.client.mget(
-        ...(keys.map(k => `${group}:${k}`) as any)
+        ...(keys.map(k =>
+          RedisCache.buildCacheKey(group, (k as any) as string)
+        ) as any)
       )
     } catch (err) {
       // todo: log error
@@ -160,6 +162,14 @@ export class RedisCache {
     return toArrWithoutNon(res)
   }
 
+  /**
+   * get single data with cache
+   * @param group cache group name
+   * @param fn origin function
+   * @param key key
+   * @param expire normal data expire
+   * @param nonExistsExpire non exists data expire
+   */
   async getOne<U = any, T = string>(
     group: string,
     fn: SingleFn<U, T>,
@@ -194,5 +204,9 @@ export class RedisCache {
       missing: 0,
       nonExists: 0
     }
+  }
+
+  static buildCacheKey(group: string, key: string) {
+    return `${group}:${key}`
   }
 }
