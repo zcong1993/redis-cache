@@ -23,12 +23,13 @@ export type OriginArrayFn<U = any, T = string> = (keys: T[]) => Promise<U[]>
 
 export const msetEx = (
   redis: Redis,
+  group: string,
   data: Map<string, string>,
   expire: number
 ) => {
   const cmds: string[][] = []
   for (const [k, v] of data.entries()) {
-    cmds.push(['set', k, v, 'ex', `${expire}`])
+    cmds.push(['set', `${group}:${k}`, v, 'ex', `${expire}`])
   }
   return redis.multi(cmds).exec()
 }
@@ -114,11 +115,11 @@ export class RedisCache {
         }
         if (cacheMp.size > 0) {
           db(`save cache, expire: ${expire}s, `, cacheMp)
-          await msetEx(this.client, cacheMp, expire)
+          await msetEx(this.client, group, cacheMp, expire)
         }
         if (missingMap.size > 0 && nee !== 0) {
           db(`save missing cache, expire: ${nee}s, `, missingMap)
-          await msetEx(this.client, missingMap, nee)
+          await msetEx(this.client, group, missingMap, nee)
         }
 
         return res
