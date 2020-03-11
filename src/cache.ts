@@ -18,6 +18,7 @@ export interface Stats {
   nonExists: number
 }
 
+export type SingleFn<U = any, T = string> = (key: T) => Promise<U>
 export type OriginFn<U = any, T = string> = (keys: T[]) => Promise<Map<T, U>>
 export type OriginArrayFn<U = any, T = string> = (keys: T[]) => Promise<U[]>
 
@@ -74,7 +75,9 @@ export class RedisCache {
     let cacheRes: string[] = []
     try {
       db(`redis mget: ${keys}`)
-      cacheRes = await this.client.mget(...(keys as any))
+      cacheRes = await this.client.mget(
+        ...(keys.map(k => `${group}:${k}`) as any)
+      )
     } catch (err) {
       // todo: log error
       console.log(`redis get error: `, err)
@@ -155,6 +158,24 @@ export class RedisCache {
     }
     const res = await this.batchGet(group, f, keys, expire, nonExistsExpire)
     return toArrWithoutNon(res)
+  }
+
+  async getOne<U = any, T = string>(
+    group: string,
+    fn: SingleFn<U, T>,
+    key: T,
+    expire: number,
+    nonExistsExpire?: number
+  ) {
+    const f = async (keys: T[]) => {
+      const res = await fn(keys[0])
+      const mp = new Map<T, U>()
+      mp.set(keys[0], res ? res : null)
+      return mp
+    }
+
+    const res = await this.batchGet(group, f, [key], expire, nonExistsExpire)
+    return res.get(key)
   }
 
   get stats() {

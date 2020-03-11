@@ -11,13 +11,23 @@ const arrFn = async (keys: string[]) => {
   return keys.slice(1).map(k => ({ k, res: `${k}-res` }))
 }
 
+const singleFn = async (key: string) => {
+  return {
+    key,
+    res: `${key}-res`
+  }
+}
+
 const main = async () => {
-  const res = await Promise.all(
-    Array(10)
-      .fill(null)
-      .map(() => rc.batchGetArray('test', arrFn, ['test1', 'test2'], 'k', 1000))
-  )
-  console.log(res, rc.stats)
+  // const res = await Promise.all(
+  //   Array(10)
+  //     .fill(null)
+  //     .map(() => rc.batchGetArray('test', arrFn, ['test1', 'test2'], 'k', 1000))
+  // )
+  // console.log(res, rc.stats)
+
+  const res1 = await rc.getOne('single', singleFn, 'test', 1000)
+  console.log(res1, rc.stats)
 }
 
 main()
