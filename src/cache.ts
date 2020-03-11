@@ -1,6 +1,7 @@
 import { Singleflight } from '@zcong/singleflight'
 import { Redis } from 'ioredis'
 import * as debug from 'debug'
+import { toMap, toArrWithoutNon } from './utils'
 
 const db = debug('redis-cache')
 
@@ -18,6 +19,7 @@ export interface Stats {
 }
 
 export type OriginFn<U = any, T = string> = (keys: T[]) => Promise<Map<T, U>>
+export type OriginArrayFn<U = any, T = string> = (keys: T[]) => Promise<U[]>
 
 export const msetEx = (
   redis: Redis,
@@ -44,6 +46,14 @@ export class RedisCache {
     this.initStats()
   }
 
+  /**
+   * batch get data by keys with cache
+   * @param group cache group name
+   * @param fn origin function
+   * @param keys batch keys
+   * @param expire normal data expire
+   * @param nonExistsExpire non exists data expire
+   */
   async batchGet<U = any, T = string>(
     group: string,
     fn: OriginFn<U, T>,
@@ -103,19 +113,11 @@ export class RedisCache {
           }
         }
         if (cacheMp.size > 0) {
-          db(
-            `save cache, expire: ${expire}s, ${JSON.stringify(
-              cacheMp.entries()
-            )}`
-          )
+          db(`save cache, expire: ${expire}s, `, cacheMp)
           await msetEx(this.client, cacheMp, expire)
         }
         if (missingMap.size > 0 && nee !== 0) {
-          db(
-            `save missing cache, expire: ${nee}s, ${JSON.stringify(
-              missingMap.entries()
-            )}`
-          )
+          db(`save missing cache, expire: ${nee}s, `, missingMap)
           await msetEx(this.client, missingMap, nee)
         }
 
@@ -127,6 +129,31 @@ export class RedisCache {
     this.plusStats({ hit, missing, nonExists })
 
     return res
+  }
+
+  /**
+   * batch get array data by keys with cache
+   * @param group cache group name
+   * @param fn origin function
+   * @param keys batch keys
+   * @param keyField key field name for detacting missing data
+   * @param expire normal data expire
+   * @param nonExistsExpire non exists data expire
+   */
+  async batchGetArray<U = any, T = string>(
+    group: string,
+    fn: OriginArrayFn<U, T>,
+    keys: T[],
+    keyField: string,
+    expire: number,
+    nonExistsExpire?: number
+  ): Promise<U[]> {
+    const f = async (keys: T[]) => {
+      const res = await fn(keys)
+      return toMap<U, T>(res, keyField, keys)
+    }
+    const res = await this.batchGet(group, f, keys, expire, nonExistsExpire)
+    return toArrWithoutNon(res)
   }
 
   get stats() {
