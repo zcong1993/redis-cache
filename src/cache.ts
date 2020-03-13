@@ -188,6 +188,12 @@ export class RedisCache {
     return res.get(key)
   }
 
+  async clear<T = string>(group: string, keys: T[]) {
+    return this.client.del(
+      ...keys.map(k => RedisCache.buildCacheKey(group, k as any))
+    )
+  }
+
   get stats() {
     return this.innerStats
   }
