@@ -18,6 +18,13 @@ const singleFn = async (key: string) => {
   }
 }
 
+const fn = async () => {
+  await sleep(1000)
+  return {
+    test: 'single fn'
+  }
+}
+
 const main = async () => {
   // const res = await Promise.all(
   //   Array(10)
@@ -26,8 +33,11 @@ const main = async () => {
   // )
   // console.log(res, rc.stats)
 
-  const res1 = await rc.getOne('single', singleFn, 'test', 1000)
-  console.log(res1, rc.stats)
+  // const res1 = await rc.getOne('single', singleFn, 'test', 1000)
+  // console.log(res1, rc.stats)
+
+  const res2 = await rc.cacheFn('fn-test', fn, 1000)
+  console.log(res2, rc.stats)
 }
 
 main()

@@ -74,12 +74,11 @@ export class RedisCache {
 
     let cacheRes: string[] = []
     try {
-      db(`redis mget: ${keys}`)
-      cacheRes = await this.client.mget(
-        ...(keys.map(k =>
-          RedisCache.buildCacheKey(group, (k as any) as string)
-        ) as any)
+      const redisKeys: string[] = keys.map(k =>
+        RedisCache.buildCacheKey(group, (k as any) as string)
       )
+      db(`redis mget: ${redisKeys}`)
+      cacheRes = await this.client.mget(...redisKeys)
     } catch (err) {
       // todo: log error
       console.log(`redis get error: `, err)
@@ -186,6 +185,37 @@ export class RedisCache {
 
     const res = await this.batchGet(group, f, [key], expire, nonExistsExpire)
     return res.get(key)
+  }
+
+  /**
+   * cache a function response, ignore any params
+   * @param group group here must be unique
+   * @param fn any function you want to cache result
+   * @param expire normal data expire
+   * @param nonExistsExpire non exists data expire
+   */
+  async cacheFn<U = any>(
+    group: string,
+    fn: (...args: any) => Promise<U>,
+    expire: number,
+    nonExistsExpire?: number
+  ): Promise<U> {
+    const hackKey: string = '__cache_func_hack_key__'
+    const f = async (_: string[]) => {
+      const res = await fn()
+      const mp = new Map<string, U>()
+      mp.set(hackKey, res ? res : null)
+      return mp
+    }
+
+    const res = await this.batchGet(
+      group,
+      f,
+      [hackKey],
+      expire,
+      nonExistsExpire
+    )
+    return res.get(hackKey)
   }
 
   async clear<T = string>(group: string, keys: T[]) {
