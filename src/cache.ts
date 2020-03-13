@@ -190,7 +190,7 @@ export class RedisCache {
   /**
    * cache a function response, ignore any params
    * @param group group here must be unique
-   * @param fn any function you want to cache result
+   * @param fn void function you want to cache result
    * @param expire normal data expire
    * @param nonExistsExpire non exists data expire
    */
