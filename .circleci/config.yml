@@ -3,10 +3,7 @@ jobs:
   build:
     docker:
       - image: circleci/node:latest
-    branches:
-      ignore:
-        - gh-pages # list of branches to ignore
-        - /release\/.*/ # or ignore regexes
+      - image: circleci/redis:latest
     steps:
       - checkout
       - restore_cache:
@@ -18,6 +15,9 @@ jobs:
           key: dependency-cache-{{ checksum "yarn.lock" }}
           paths:
             - ./node_modules
+      - run:
+          name: wait for redis
+          command: dockerize -wait tcp://localhost:6379 -timeout 1m
       - run:
           name: test
           command: yarn test:cov

@@ -196,7 +196,7 @@ export class RedisCache {
    */
   async cacheFn<U = any>(
     group: string,
-    fn: (...args: any) => Promise<U>,
+    fn: () => Promise<U>,
     expire: number,
     nonExistsExpire?: number
   ): Promise<U> {
