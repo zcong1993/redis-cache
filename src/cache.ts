@@ -5,17 +5,22 @@ import { toMap, toArrWithoutNon } from './utils'
 
 const db = debug('redis-cache')
 
-export const NON_EXISTS_FLAG = '-1'
+export const DEFAULT_NON_EXISTS_FLAG = '@@-1'
 
 export interface RedisCacheOptions {
   client: Redis
   nonExistsExpire?: number
+  nonExistsValue?: string
 }
 
 export interface Stats {
   hit: number
   missing: number
   nonExists: number
+}
+
+export interface ExtOps {
+  nonExistsExpire?: number
 }
 
 export type SingleFn<U = any, T = string> = (key: T) => Promise<U>
@@ -40,8 +45,15 @@ export class RedisCache {
   private readonly opts: RedisCacheOptions
   private readonly client: Redis
   private readonly sf: Singleflight
+  private readonly NON_EXISTS_FLAG: string = DEFAULT_NON_EXISTS_FLAG
 
   constructor(opts: RedisCacheOptions) {
+    if (!opts.nonExistsExpire) {
+      opts.nonExistsExpire = 10
+    }
+    if (opts.nonExistsValue) {
+      this.NON_EXISTS_FLAG = opts.nonExistsValue
+    }
     this.opts = opts
     this.client = opts.client
     this.sf = new Singleflight()
@@ -54,18 +66,30 @@ export class RedisCache {
    * @param fn origin function
    * @param keys batch keys
    * @param expire normal data expire
-   * @param nonExistsExpire non exists data expire
+   * @param ext ext options
    */
   async batchGet<U = any, T = string>(
     group: string,
     fn: OriginFn<U, T>,
     keys: T[],
     expire: number,
-    nonExistsExpire?: number
+    ext?: number | ExtOps
   ): Promise<Map<T, U>> {
     let hit: number = 0
     let missing: number = 0
     let nonExists: number = 0
+
+    let nonExistsExpire: number = undefined
+
+    if (ext !== undefined) {
+      // legicy
+      if (typeof ext === 'number') {
+        nonExistsExpire = ext
+      } else {
+        // new options
+        nonExistsExpire = ext.nonExistsExpire
+      }
+    }
 
     const nee =
       nonExistsExpire !== undefined
@@ -74,13 +98,14 @@ export class RedisCache {
 
     let cacheRes: string[] = []
     try {
-      const redisKeys: string[] = keys.map(k =>
+      const redisKeys: string[] = keys.map((k) =>
         RedisCache.buildCacheKey(group, (k as any) as string)
       )
       db(`redis mget: ${redisKeys}`)
       cacheRes = await this.client.mget(...redisKeys)
     } catch (err) {
       // todo: log error
+      /* istanbul ignore next */
       console.log(`redis get error: `, err)
     }
     let res = new Map<T, U>()
@@ -88,12 +113,13 @@ export class RedisCache {
     for (let i = 0; i < keys.length; i += 1) {
       if (cacheRes[i] !== null) {
         hit += 1
-        if (cacheRes[i] === NON_EXISTS_FLAG) {
+        if (cacheRes[i] === this.NON_EXISTS_FLAG) {
           db(`non exists key: ${keys[i]}`)
           nonExists += 1
           res.set(keys[i], null)
         } else {
-          res.set(keys[i], (JSON.parse(cacheRes[i]) as any) as U)
+          const val = JSON.parse(cacheRes[i])
+          res.set(keys[i], val as U)
         }
       } else {
         missing += 1
@@ -112,9 +138,10 @@ export class RedisCache {
         for (const k of missingRes.keys()) {
           res.set(k, missingRes.get(k))
           if (missingRes.get(k) !== null) {
-            cacheMp.set(k, JSON.stringify(missingRes.get(k)))
+            const val = JSON.stringify(missingRes.get(k))
+            cacheMp.set(k, val)
           } else {
-            missingMap.set(k, NON_EXISTS_FLAG)
+            missingMap.set(k, this.NON_EXISTS_FLAG)
           }
         }
         if (cacheMp.size > 0) {
@@ -143,7 +170,7 @@ export class RedisCache {
    * @param keys batch keys
    * @param keyField key field name for detacting missing data
    * @param expire normal data expire
-   * @param nonExistsExpire non exists data expire
+   * @param ext ext options
    */
   async batchGetArray<U = any, T = string>(
     group: string,
@@ -151,13 +178,13 @@ export class RedisCache {
     keys: T[],
     keyField: string,
     expire: number,
-    nonExistsExpire?: number
+    ext?: number | ExtOps
   ): Promise<U[]> {
     const f = async (keys: T[]) => {
       const res = await fn(keys)
       return toMap<U, T>(res, keyField, keys)
     }
-    const res = await this.batchGet(group, f, keys, expire, nonExistsExpire)
+    const res = await this.batchGet(group, f, keys, expire, ext)
     return toArrWithoutNon(res)
   }
 
@@ -167,14 +194,14 @@ export class RedisCache {
    * @param fn origin function
    * @param key key
    * @param expire normal data expire
-   * @param nonExistsExpire non exists data expire
+   * @param ext ext options
    */
   async getOne<U = any, T = string>(
     group: string,
     fn: SingleFn<U, T>,
     key: T,
     expire: number,
-    nonExistsExpire?: number
+    ext?: number | ExtOps
   ) {
     const f = async (keys: T[]) => {
       const res = await fn(keys[0])
@@ -183,7 +210,7 @@ export class RedisCache {
       return mp
     }
 
-    const res = await this.batchGet(group, f, [key], expire, nonExistsExpire)
+    const res = await this.batchGet(group, f, [key], expire, ext)
     return res.get(key)
   }
 
@@ -192,13 +219,13 @@ export class RedisCache {
    * @param group group here must be unique
    * @param fn void function you want to cache result
    * @param expire normal data expire
-   * @param nonExistsExpire non exists data expire
+   * @param ext ext options
    */
   async cacheFn<U = any>(
     group: string,
     fn: () => Promise<U>,
     expire: number,
-    nonExistsExpire?: number
+    ext?: number | ExtOps
   ): Promise<U> {
     const hackKey: string = '__cache_func_hack_key__'
     const f = async (_: string[]) => {
@@ -208,19 +235,13 @@ export class RedisCache {
       return mp
     }
 
-    const res = await this.batchGet(
-      group,
-      f,
-      [hackKey],
-      expire,
-      nonExistsExpire
-    )
+    const res = await this.batchGet(group, f, [hackKey], expire, ext)
     return res.get(hackKey)
   }
 
   async clear<T = string>(group: string, keys: T[]) {
     return this.client.del(
-      ...keys.map(k => RedisCache.buildCacheKey(group, k as any))
+      ...keys.map((k) => RedisCache.buildCacheKey(group, k as any))
     )
   }
 
@@ -238,7 +259,7 @@ export class RedisCache {
     this.innerStats = {
       hit: 0,
       missing: 0,
-      nonExists: 0
+      nonExists: 0,
     }
   }
 

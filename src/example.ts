@@ -5,7 +5,7 @@ const client = new Redis()
 
 const rc = new RedisCache({ client, nonExistsExpire: 100 })
 
-const sleep = (n: number) => new Promise(r => setTimeout(r, n))
+const sleep = (n: number) => new Promise((r) => setTimeout(r, n))
 
 interface Res {
   k: string
@@ -18,7 +18,7 @@ const genRes = (k: string): Res => {
 
 const mapFn = async (keys: string[]): Promise<Map<string, Res>> => {
   const mp = new Map<string, Res>()
-  keys.forEach(k => {
+  keys.forEach((k) => {
     mp.set(k, genRes(k))
   })
   return mp

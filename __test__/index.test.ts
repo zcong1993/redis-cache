@@ -3,7 +3,7 @@ import { RedisCache } from '../src'
 
 const redis = new Redis(process.env.REDIS_URI)
 
-const sleep = (n: number) => new Promise(r => setTimeout(r, n))
+const sleep = (n: number) => new Promise((r) => setTimeout(r, n))
 
 beforeEach(async () => {
   await redis.flushdb()
@@ -11,7 +11,7 @@ beforeEach(async () => {
 
 const mockResByKey = (k: string) => ({
   k,
-  value: `${k}-res`
+  value: `${k}-res`,
 })
 
 it('batchGet should work well', async () => {
@@ -19,7 +19,7 @@ it('batchGet should work well', async () => {
   const batchFn = async (keys: string[]) => {
     await sleep(100)
     const res = new Map()
-    keys.forEach(k => {
+    keys.forEach((k) => {
       res.set(k, mockResByKey(k))
     })
     return res
@@ -137,7 +137,7 @@ it('nonExists should work well', async () => {
   const batchFn = async (keys: string[]) => {
     await sleep(100)
     const res = new Map()
-    keys.forEach(k => {
+    keys.forEach((k) => {
       if (k === nonExistKey) {
         res.set(k, null)
       } else {
@@ -163,8 +163,108 @@ it('nonExists should work well', async () => {
 
   for (let i = 0; i < 10; i += 1) {
     // test subset keys should be cached and not call origin fn
-    await rc.batchGet('test-batchGet-1', batchFnWrapper, testKeys.slice(1), 10)
+    await rc.batchGet(
+      'test-batchGet-1',
+      batchFnWrapper,
+      testKeys.slice(1),
+      10,
+      5
+    )
+    // new options
+    await rc.batchGet(
+      'test-batchGet-1',
+      batchFnWrapper,
+      testKeys.slice(1),
+      10,
+      { nonExistsExpire: 5 }
+    )
   }
 
   expect(batchFnWrapper).toBeCalledTimes(1)
+})
+
+it('custom nonExists value should work well', async () => {
+  const nonExistKey: string = 'nonExistKey'
+  const customNonExistsVal: string = '!!-1'
+  const rc = new RedisCache({
+    client: redis,
+    nonExistsExpire: 5,
+    nonExistsValue: customNonExistsVal,
+  })
+  const batchFn = async (keys: string[]) => {
+    await sleep(100)
+    const res = new Map()
+    keys.forEach((k) => {
+      if (k === nonExistKey) {
+        res.set(k, null)
+      } else {
+        res.set(k, mockResByKey(k))
+      }
+    })
+    return res
+  }
+
+  const testKeys: string[] = ['a', 'b', 'c', nonExistKey]
+  const directRes = await batchFn(testKeys)
+  const batchFnWrapper = jest.fn(batchFn)
+
+  for (let i = 0; i < 10; i += 1) {
+    const res = await rc.batchGet(
+      'test-batchGet-1',
+      batchFnWrapper,
+      testKeys,
+      10
+    )
+    expect(res).toEqual(directRes)
+  }
+
+  for (let i = 0; i < 10; i += 1) {
+    // test subset keys should be cached and not call origin fn
+    await rc.batchGet(
+      'test-batchGet-1',
+      batchFnWrapper,
+      testKeys.slice(1),
+      10,
+      5
+    )
+    // new options
+    await rc.batchGet(
+      'test-batchGet-1',
+      batchFnWrapper,
+      testKeys.slice(1),
+      10,
+      { nonExistsExpire: 5 }
+    )
+  }
+
+  expect(batchFnWrapper).toBeCalledTimes(1)
+  expect(await redis.get(`test-batchGet-1:${nonExistKey}`)).toBe(
+    customNonExistsVal
+  )
+})
+
+it('non JSON should works well', async () => {
+  const rc = new RedisCache({ client: redis })
+  const batchFn = async (keys: string[]) => {
+    await sleep(100)
+    const res = new Map()
+    keys.forEach((k) => {
+      res.set(k, `key-${k}`)
+    })
+    return res
+  }
+
+  const testKeys: string[] = ['a', 'b', 'c']
+  const directRes = await batchFn(testKeys)
+  const batchFnWrapper = jest.fn(batchFn)
+
+  for (let i = 0; i < 10; i += 1) {
+    const res = await rc.batchGet(
+      'test-batchGet-1',
+      batchFnWrapper,
+      testKeys,
+      10
+    )
+    expect(res).toEqual(directRes)
+  }
 })

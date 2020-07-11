@@ -12,10 +12,10 @@ export const toMap = <U = any, T = string>(
   keys: T[]
 ): Map<T, U> => {
   const res = new Map<T, U>()
-  mp.forEach(m => {
+  mp.forEach((m) => {
     res.set((m as any)[field], m)
   })
-  keys.forEach(k => {
+  keys.forEach((k) => {
     if (!res.has(k)) {
       res.set(k, null)
     }
