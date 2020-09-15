@@ -9,6 +9,7 @@ export const DEFAULT_NON_EXISTS_FLAG = '@@-1'
 
 export interface RedisCacheOptions {
   client: Redis
+  keyPrefix?: string
   nonExistsExpire?: number
   nonExistsValue?: string
 }
@@ -31,11 +32,18 @@ export const msetEx = (
   redis: Redis,
   group: string,
   data: Map<string, string>,
-  expire: number
+  expire: number,
+  keyPrefix?: string
 ) => {
   const cmds: string[][] = []
   for (const [k, v] of data.entries()) {
-    cmds.push(['set', RedisCache.buildCacheKey(group, k), v, 'ex', `${expire}`])
+    cmds.push([
+      'set',
+      RedisCache.buildCacheKey(keyPrefix, group, k),
+      v,
+      'ex',
+      `${expire}`,
+    ])
   }
   return redis.multi(cmds).exec()
 }
@@ -53,6 +61,9 @@ export class RedisCache {
     }
     if (opts.nonExistsValue) {
       this.NON_EXISTS_FLAG = opts.nonExistsValue
+    }
+    if (!opts.keyPrefix) {
+      opts.keyPrefix = ''
     }
     this.opts = opts
     this.client = opts.client
@@ -99,7 +110,11 @@ export class RedisCache {
     let cacheRes: string[] = []
     try {
       const redisKeys: string[] = keys.map((k) =>
-        RedisCache.buildCacheKey(group, (k as any) as string)
+        RedisCache.buildCacheKey(
+          this.opts.keyPrefix,
+          group,
+          (k as any) as string
+        )
       )
       db(`redis mget: ${redisKeys}`)
       cacheRes = await this.client.mget(...redisKeys)
@@ -146,11 +161,11 @@ export class RedisCache {
         }
         if (cacheMp.size > 0) {
           db(`save cache, expire: ${expire}s, `, cacheMp)
-          await msetEx(this.client, group, cacheMp, expire)
+          await msetEx(this.client, group, cacheMp, expire, this.opts.keyPrefix)
         }
         if (missingMap.size > 0 && nee !== 0) {
           db(`save missing cache, expire: ${nee}s, `, missingMap)
-          await msetEx(this.client, group, missingMap, nee)
+          await msetEx(this.client, group, missingMap, nee, this.opts.keyPrefix)
         }
 
         return res
@@ -241,7 +256,9 @@ export class RedisCache {
 
   async clear<T = string>(group: string, keys: T[]) {
     return this.client.del(
-      ...keys.map((k) => RedisCache.buildCacheKey(group, k as any))
+      ...keys.map((k) =>
+        RedisCache.buildCacheKey(this.opts.keyPrefix, group, k as any)
+      )
     )
   }
 
@@ -263,7 +280,7 @@ export class RedisCache {
     }
   }
 
-  static buildCacheKey(group: string, key: string) {
-    return `${group}:${key}`
+  static buildCacheKey(...keys: string[]) {
+    return keys.filter(Boolean).join(':')
   }
 }

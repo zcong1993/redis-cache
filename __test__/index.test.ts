@@ -45,6 +45,10 @@ it('batchGet should work well', async () => {
   }
 
   expect(batchFnWrapper).toBeCalledTimes(1)
+
+  for (const k of testKeys) {
+    expect(await redis.get(`test-batchGet-1:${k}`)).not.toBeNull()
+  }
 })
 
 it('batchGetArray should work well', async () => {
@@ -266,5 +270,35 @@ it('non JSON should works well', async () => {
       10
     )
     expect(res).toEqual(directRes)
+  }
+})
+
+it('keyPrefix options should works well', async () => {
+  const rc = new RedisCache({ client: redis, keyPrefix: 'test' })
+  const batchFn = async (keys: string[]) => {
+    await sleep(100)
+    const res = new Map()
+    keys.forEach((k) => {
+      res.set(k, mockResByKey(k))
+    })
+    return res
+  }
+
+  const testKeys: string[] = ['a', 'b', 'c']
+  const directRes = await batchFn(testKeys)
+  const batchFnWrapper = jest.fn(batchFn)
+
+  for (let i = 0; i < 10; i += 1) {
+    const res = await rc.batchGet(
+      'test-batchGet-1',
+      batchFnWrapper,
+      testKeys,
+      10
+    )
+    expect(res).toEqual(directRes)
+  }
+
+  for (const k of testKeys) {
+    expect(await redis.get(`test:test-batchGet-1:${k}`)).not.toBeNull()
   }
 })
