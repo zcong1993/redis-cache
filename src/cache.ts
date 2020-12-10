@@ -1,17 +1,25 @@
 import { Singleflight } from '@zcong/singleflight'
 import { Redis } from 'ioredis'
 import * as debug from 'debug'
-import { toMap, toArrWithoutNon } from './utils'
+import { toMap, toArrWithoutNon, loadPackage } from './utils'
 
 const db = debug('redis-cache')
 
 export const DEFAULT_NON_EXISTS_FLAG = '@@-1'
+
+let promClient: any = {}
+
+let requestsCounter: any
+let hitCounter: any
+let nonExistsCounter: any
+let deleteCounter: any
 
 export interface RedisCacheOptions {
   client: Redis
   keyPrefix?: string
   nonExistsExpire?: number
   nonExistsValue?: string
+  withPrometheus?: boolean
 }
 
 export interface Stats {
@@ -42,7 +50,7 @@ export const msetEx = (
       RedisCache.buildCacheKey(keyPrefix, group, k),
       v,
       'ex',
-      `${expire}`,
+      `${expire}`
     ])
   }
   return redis.multi(cmds).exec()
@@ -65,8 +73,17 @@ export class RedisCache {
     if (!opts.keyPrefix) {
       opts.keyPrefix = ''
     }
+
     this.opts = opts
     this.client = opts.client
+
+    if (opts.withPrometheus) {
+      promClient = loadPackage('prom-client', 'withPrometheus', () =>
+        require('prom-client')
+      )
+      this.setupPrometheus()
+    }
+
     this.sf = new Singleflight()
     this.initStats()
   }
@@ -92,6 +109,8 @@ export class RedisCache {
 
     let nonExistsExpire: number = undefined
 
+    this.incrCounter(requestsCounter, keys.length)
+
     if (ext !== undefined) {
       // legicy
       if (typeof ext === 'number') {
@@ -109,7 +128,7 @@ export class RedisCache {
 
     let cacheRes: string[] = []
     try {
-      const redisKeys: string[] = keys.map((k) =>
+      const redisKeys: string[] = keys.map(k =>
         RedisCache.buildCacheKey(
           this.opts.keyPrefix,
           group,
@@ -174,6 +193,8 @@ export class RedisCache {
 
     db(`stats, hit: ${hit}, missing: ${missing}, nonExists: ${nonExists}`)
     this.plusStats({ hit, missing, nonExists })
+    this.incrCounter(hitCounter, hit)
+    this.incrCounter(nonExistsCounter, nonExists)
 
     return res
   }
@@ -255,8 +276,9 @@ export class RedisCache {
   }
 
   async clear<T = string>(group: string, keys: T[]) {
+    this.incrCounter(deleteCounter, keys.length)
     return this.client.del(
-      ...keys.map((k) =>
+      ...keys.map(k =>
         RedisCache.buildCacheKey(this.opts.keyPrefix, group, k as any)
       )
     )
@@ -276,8 +298,41 @@ export class RedisCache {
     this.innerStats = {
       hit: 0,
       missing: 0,
-      nonExists: 0,
+      nonExists: 0
     }
+  }
+
+  private setupPrometheus() {
+    if (!this.opts.withPrometheus) {
+      return
+    }
+
+    requestsCounter = new promClient.Counter({
+      name: 'cache_requests_total',
+      help: 'Total number of requests to the cache.'
+    })
+
+    hitCounter = new promClient.Counter({
+      name: 'cache_hits_total',
+      help: 'Total number of requests to the cache that were a hit.'
+    })
+
+    nonExistsCounter = new promClient.Counter({
+      name: 'cache_non_exists_total',
+      help: 'Total number of requests to the cache that record not exists.'
+    })
+
+    deleteCounter = new promClient.Counter({
+      name: 'cache_delete_total',
+      help: 'Total number of items that were deleted from the index cache.'
+    })
+  }
+
+  private incrCounter(counter: any, val: number) {
+    if (!counter || val <= 0) {
+      return
+    }
+    counter.inc(val)
   }
 
   static buildCacheKey(...keys: string[]) {

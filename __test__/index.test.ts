@@ -3,7 +3,7 @@ import { RedisCache } from '../src'
 
 const redis = new Redis(process.env.REDIS_URI)
 
-const sleep = (n: number) => new Promise((r) => setTimeout(r, n))
+const sleep = (n: number) => new Promise(r => setTimeout(r, n))
 
 beforeEach(async () => {
   await redis.flushdb()
@@ -11,7 +11,7 @@ beforeEach(async () => {
 
 const mockResByKey = (k: string) => ({
   k,
-  value: `${k}-res`,
+  value: `${k}-res`
 })
 
 it('batchGet should work well', async () => {
@@ -19,7 +19,7 @@ it('batchGet should work well', async () => {
   const batchFn = async (keys: string[]) => {
     await sleep(100)
     const res = new Map()
-    keys.forEach((k) => {
+    keys.forEach(k => {
       res.set(k, mockResByKey(k))
     })
     return res
@@ -141,7 +141,7 @@ it('nonExists should work well', async () => {
   const batchFn = async (keys: string[]) => {
     await sleep(100)
     const res = new Map()
-    keys.forEach((k) => {
+    keys.forEach(k => {
       if (k === nonExistKey) {
         res.set(k, null)
       } else {
@@ -193,12 +193,12 @@ it('custom nonExists value should work well', async () => {
   const rc = new RedisCache({
     client: redis,
     nonExistsExpire: 5,
-    nonExistsValue: customNonExistsVal,
+    nonExistsValue: customNonExistsVal
   })
   const batchFn = async (keys: string[]) => {
     await sleep(100)
     const res = new Map()
-    keys.forEach((k) => {
+    keys.forEach(k => {
       if (k === nonExistKey) {
         res.set(k, null)
       } else {
@@ -252,7 +252,7 @@ it('non JSON should works well', async () => {
   const batchFn = async (keys: string[]) => {
     await sleep(100)
     const res = new Map()
-    keys.forEach((k) => {
+    keys.forEach(k => {
       res.set(k, `key-${k}`)
     })
     return res
@@ -278,7 +278,7 @@ it('keyPrefix options should works well', async () => {
   const batchFn = async (keys: string[]) => {
     await sleep(100)
     const res = new Map()
-    keys.forEach((k) => {
+    keys.forEach(k => {
       res.set(k, mockResByKey(k))
     })
     return res

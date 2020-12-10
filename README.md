@@ -20,7 +20,7 @@ const rc = new RedisCache({ client: new Redis(), nonExistsExpire: 100 })
 // cache map result: keys -> Map<key, value>
 const mapFn = async (keys: string[]): Promise<Map<string, Res>> => {
   const mp = new Map<string, Res>()
-  keys.forEach((k) => {
+  keys.forEach(k => {
     mp.set(k, genRes(k))
   })
   return mp
