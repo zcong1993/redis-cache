@@ -169,13 +169,17 @@ export class RedisCache {
         const missingRes = await fn(missingKeys)
         const cacheMp = new Map()
         const missingMap = new Map()
-        for (const k of missingRes.keys()) {
-          res.set(k, missingRes.get(k))
-          if (missingRes.get(k) !== null) {
+        for (const k of missingKeys) {
+          if (missingRes.has(k)) {
+            res.set(k, missingRes.get(k))
+          }
+
+          if (missingRes.has(k) && missingRes.get(k) !== null) {
             const val = JSON.stringify(missingRes.get(k))
             cacheMp.set(k, val)
           } else {
             missingMap.set(k, this.NON_EXISTS_FLAG)
+            nonExists += 1
           }
         }
         if (cacheMp.size > 0) {
