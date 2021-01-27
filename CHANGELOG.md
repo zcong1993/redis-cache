@@ -1,3 +1,12 @@
+# [0.6.0](https://github.com/zcong1993/redis-cache/compare/v0.5.1...v0.6.0) (2021-01-27)
+
+
+### Features
+
+* **core:** add get real redis key method ([646cefa](https://github.com/zcong1993/redis-cache/commit/646cefa12625ac5c54f8fd213648c236dd843ada))
+
+
+
 ## [0.5.1](https://github.com/zcong1993/redis-cache/compare/v0.5.0...v0.5.1) (2020-12-10)
 
 # [0.5.0](https://github.com/zcong1993/redis-cache/compare/v0.4.0...v0.5.0) (2020-12-10)
