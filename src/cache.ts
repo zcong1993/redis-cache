@@ -6,6 +6,7 @@ import { toMap, toArrWithoutNon, loadPackage } from './utils'
 const db = debug('redis-cache')
 
 export const DEFAULT_NON_EXISTS_FLAG = '@@-1'
+export const cacheFnHackKey: string = '__cache_func_hack_key__'
 
 let promClient: any = {}
 
@@ -267,16 +268,15 @@ export class RedisCache {
     expire: number,
     ext?: number | ExtOps
   ): Promise<U> {
-    const hackKey: string = '__cache_func_hack_key__'
     const f = async (_: string[]) => {
       const res = await fn()
       const mp = new Map<string, U>()
-      mp.set(hackKey, res ? res : null)
+      mp.set(cacheFnHackKey, res ? res : null)
       return mp
     }
 
-    const res = await this.batchGet(group, f, [hackKey], expire, ext)
-    return res.get(hackKey)
+    const res = await this.batchGet(group, f, [cacheFnHackKey], expire, ext)
+    return res.get(cacheFnHackKey)
   }
 
   async clear<T = string>(group: string, keys: T[]) {
@@ -286,6 +286,14 @@ export class RedisCache {
         RedisCache.buildCacheKey(this.opts.keyPrefix, group, k as any)
       )
     )
+  }
+
+  getRealRedisKey(group: string, cacheKey: string) {
+    return RedisCache.buildCacheKey(this.opts.keyPrefix, group, cacheKey)
+  }
+
+  getRealCacheFnRedisKey(group: string) {
+    return RedisCache.buildCacheKey(this.opts.keyPrefix, group, cacheFnHackKey)
   }
 
   get stats() {

@@ -1,5 +1,5 @@
 import * as Redis from 'ioredis'
-import { RedisCache } from '../src'
+import { cacheFnHackKey, RedisCache } from '../src'
 
 const redis = new Redis(process.env.REDIS_URI)
 
@@ -301,4 +301,14 @@ it('keyPrefix options should works well', async () => {
   for (const k of testKeys) {
     expect(await redis.get(`test:test-batchGet-1:${k}`)).not.toBeNull()
   }
+})
+
+it('test get real redis key', async () => {
+  const rc = new RedisCache({ client: redis, keyPrefix: 'test' })
+  expect(rc.getRealRedisKey('g1', 'test1')).toBe('test:g1:test1')
+  expect(rc.getRealCacheFnRedisKey('g2')).toBe(`test:g2:${cacheFnHackKey}`)
+
+  const rc2 = new RedisCache({ client: redis })
+  expect(rc2.getRealRedisKey('g1', 'test1')).toBe('g1:test1')
+  expect(rc2.getRealCacheFnRedisKey('g2')).toBe(`g2:${cacheFnHackKey}`)
 })
