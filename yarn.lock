@@ -829,10 +829,10 @@
   dependencies:
     "@types/yargs-parser" "*"
 
-"@zcong/singleflight@^0.2.0":
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/@zcong/singleflight/-/singleflight-0.2.0.tgz#6a7627bb1ea12fafdba97d751c9e13a69dcd689b"
-  integrity sha512-Ta9IA4sM3iBUT0gDr9oxuAihporAX9fT9+3gBPA1SIdZQiN5j2sxcHNF2ofdZpaBHO8GZ5iZh34AJ+JEk5FxWw==
+"@zcong/singleflight@^0.3.0":
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/@zcong/singleflight/-/singleflight-0.3.0.tgz#077d5373259012784d80fa881660c3b2404e1f92"
+  integrity sha512-Lfvkmiisa38VwXBMGxQ5ftKB6GLC9TE80YXeiWs9mGRo1eXjipOsNfHMjWudrSRHYZPYUABg5a0mDZ2UnNqCew==
 
 abab@^2.0.3:
   version "2.0.3"
