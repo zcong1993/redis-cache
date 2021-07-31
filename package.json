@@ -63,7 +63,7 @@
     }
   },
   "dependencies": {
-    "@zcong/singleflight": "^0.2.0",
+    "@zcong/singleflight": "^0.3.0",
     "debug": "^4.1.1"
   }
 }
